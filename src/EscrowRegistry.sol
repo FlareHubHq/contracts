@@ -52,6 +52,27 @@ contract EscrowRegistry is
         _;
     }
 
+    function _getBounty(uint256 escrowId) internal view returns (BountyEscrow storage e) {
+        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
+        e = bounties[escrowId];
+        if (e.sponsor == address(0)) revert InvalidEscrow();
+    }
+
+    function _getContract(uint256 escrowId) internal view returns (ContractMeta storage cm) {
+        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.ContractEscrow) revert InvalidKind();
+        cm = contractsMeta[escrowId];
+        if (cm.sponsor == address(0)) revert InvalidEscrow();
+    }
+
+    function _getMilestone(ContractMeta storage cm, uint256 escrowId, uint256 index)
+        internal
+        view
+        returns (Milestone storage ms)
+    {
+        if (index >= cm.milestones) revert IndexOutOfBounds();
+        ms = milestones[escrowId][index];
+    }
+
     constructor() {
         _disableInitializers();
     }
@@ -96,8 +117,7 @@ contract EscrowRegistry is
     }
 
     function fundBounty(uint256 escrowId, uint256 amount) external payable {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
-        BountyEscrow storage e = bounties[escrowId];
+        BountyEscrow storage e = _getBounty(escrowId);
         if (e.paused) revert ContractPaused();
         if (e.token == address(0)) {
             if (msg.value != amount || amount == 0) revert InvalidValue(amount, msg.value);
@@ -114,15 +134,13 @@ contract EscrowRegistry is
         external
         onlyOperatorOrOwner
     {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
-        BountyEscrow storage e = bounties[escrowId];
+        BountyEscrow storage e = _getBounty(escrowId);
         e.root = root;
         emit EscrowDistributionRootSet(escrowId, root, version);
     }
 
     function claimBounty(uint256 escrowId, uint256 amount, bytes32 offchainHash, bytes32[] calldata proof) external {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
-        BountyEscrow storage e = bounties[escrowId];
+        BountyEscrow storage e = _getBounty(escrowId);
         if (e.paused) revert ContractPaused();
         if (e.root == bytes32(0)) revert NoRoot();
         bytes32 leaf = keccak256(abi.encodePacked(offchainHash, msg.sender, amount));
@@ -136,8 +154,7 @@ contract EscrowRegistry is
     }
 
     function refundRemainder(uint256 escrowId) external {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
-        BountyEscrow storage e = bounties[escrowId];
+        BountyEscrow storage e = _getBounty(escrowId);
         if (msg.sender != e.sponsor) revert SponsorOnly();
         if (block.timestamp < e.clawbackAt) revert TimeNotReached(e.clawbackAt);
         uint256 amt = e.balance;
@@ -148,9 +165,11 @@ contract EscrowRegistry is
 
     function pauseEscrow(uint256 escrowId) external onlyOperatorOrOwner {
         if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.Bounty) {
-            bounties[escrowId].paused = true;
+            BountyEscrow storage e = _getBounty(escrowId);
+            e.paused = true;
         } else if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.ContractEscrow) {
-            contractsMeta[escrowId].paused = true;
+            ContractMeta storage cm = _getContract(escrowId);
+            cm.paused = true;
         } else {
             revert InvalidEscrow();
         }
@@ -159,9 +178,11 @@ contract EscrowRegistry is
 
     function unpauseEscrow(uint256 escrowId) external onlyOperatorOrOwner {
         if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.Bounty) {
-            bounties[escrowId].paused = false;
+            BountyEscrow storage e = _getBounty(escrowId);
+            e.paused = false;
         } else if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.ContractEscrow) {
-            contractsMeta[escrowId].paused = false;
+            ContractMeta storage cm = _getContract(escrowId);
+            cm.paused = false;
         } else {
             revert InvalidEscrow();
         }
@@ -193,18 +214,17 @@ contract EscrowRegistry is
     }
 
     function fundMilestone(uint256 escrowId, uint256 index, uint256 amount) external payable {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.ContractEscrow) revert InvalidKind();
-        ContractMeta storage m = contractsMeta[escrowId];
-        if (m.paused) revert ContractPaused();
-        if (index >= m.milestones) revert IndexOutOfBounds();
-        Milestone storage ms = milestones[escrowId][index];
+        ContractMeta storage cm = _getContract(escrowId);
+        if (msg.sender != cm.sponsor) revert SponsorOnly();
+        if (cm.paused) revert ContractPaused();
+        Milestone storage ms = _getMilestone(cm, escrowId, index);
         if (ms.refunded) revert Refunded();
-        if (m.token == address(0)) {
+        if (cm.token == address(0)) {
             if (msg.value != amount || amount == 0) revert InvalidValue(amount, msg.value);
         } else {
             if (msg.value != 0) revert NoEthAllowed();
             if (amount == 0) revert AmountInvalid();
-            IERC20(m.token).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(cm.token).safeTransferFrom(msg.sender, address(this), amount);
         }
         ms.funded += amount;
         emit EscrowMilestoneFunded(escrowId, index, msg.sender, amount);
@@ -215,14 +235,12 @@ contract EscrowRegistry is
         bytes calldata sigSponsor,
         bytes calldata sigOperator
     ) external {
-        if (escrowKind[a.escrowId] != IEscrowRegistry.EscrowKind.ContractEscrow) revert InvalidKind();
-        ContractMeta storage cm = contractsMeta[a.escrowId];
+        ContractMeta storage cm = _getContract(a.escrowId);
         if (cm.paused) revert ContractPaused();
-        if (a.milestoneIndex >= cm.milestones) revert IndexOutOfBounds();
+        Milestone storage ms = _getMilestone(cm, a.escrowId, a.milestoneIndex);
         if (a.token != cm.token) revert TokenMismatch();
         if (block.timestamp > a.expiration) revert Expired();
         if (nonceUsed[a.escrowId][a.milestoneIndex][a.nonce]) revert NonceUsed();
-        Milestone storage ms = milestones[a.escrowId][a.milestoneIndex];
         uint256 available = ms.funded - ms.claimed;
         if (!(a.amount <= available && a.amount > 0)) revert AmountInvalid();
         bytes32 structHash = keccak256(
@@ -259,13 +277,12 @@ contract EscrowRegistry is
         uint256 nonce,
         uint64 expiration
     ) external {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.ContractEscrow) revert InvalidKind();
-        ContractMeta storage cm = contractsMeta[escrowId];
+        ContractMeta storage cm = _getContract(escrowId);
         if (msg.sender != cm.sponsor) revert SponsorOnly();
         if (cm.paused) revert ContractPaused();
         if (block.timestamp > expiration) revert Expired();
         if (nonceUsed[escrowId][index][nonce]) revert NonceUsed();
-        Milestone storage ms = milestones[escrowId][index];
+        Milestone storage ms = _getMilestone(cm, escrowId, index);
         uint256 available = ms.funded - ms.claimed;
         if (!(amount <= available && amount > 0)) revert AmountInvalid();
         bytes32 structHash =
@@ -278,11 +295,10 @@ contract EscrowRegistry is
     }
 
     function refundMilestone(uint256 escrowId, uint256 index) external {
-        if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.ContractEscrow) revert InvalidKind();
-        ContractMeta storage cm = contractsMeta[escrowId];
+        ContractMeta storage cm = _getContract(escrowId);
         if (msg.sender != cm.sponsor) revert SponsorOnly();
         if (block.timestamp < cm.clawbackAt) revert TimeNotReached(cm.clawbackAt);
-        Milestone storage ms = milestones[escrowId][index];
+        Milestone storage ms = _getMilestone(cm, escrowId, index);
         if (ms.refunded) revert Refunded();
         uint256 refundable = ms.funded - ms.claimed;
         ms.refunded = true;

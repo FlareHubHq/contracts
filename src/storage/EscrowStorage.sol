@@ -59,6 +59,8 @@ abstract contract EscrowStorage {
 
     address public operator;
 
+    uint256[50] private __gap;
+
     function _payout(address token, address to, uint256 amount) internal {
         if (token == address(0)) {
             (bool ok,) = to.call{ value: amount }("");
