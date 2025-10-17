@@ -36,7 +36,7 @@ import {
     TokenMismatch
 } from "./errors/EscrowErrors.sol";
 
-contract EscrowRegistryUpgradeable is
+contract EscrowRegistry is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,

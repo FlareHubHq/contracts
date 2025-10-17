@@ -2,19 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {EscrowRegistryUpgradeable} from "../src/EscrowRegistryUpgradeable.sol";
+import {EscrowRegistry} from "../src/EscrowRegistry.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract EscrowTest is Test {
-    EscrowRegistryUpgradeable public registry;
+    EscrowRegistry public registry;
     address sponsor = address(0xA11CE);
     address talent = address(0xB0B);
 
     function setUp() public {
-        EscrowRegistryUpgradeable impl = new EscrowRegistryUpgradeable();
-        bytes memory initData = abi.encodeWithSelector(EscrowRegistryUpgradeable.initialize.selector, address(0));
+        EscrowRegistry impl = new EscrowRegistry();
+        bytes memory initData = abi.encodeWithSelector(EscrowRegistry.initialize.selector, address(0));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        registry = EscrowRegistryUpgradeable(payable(address(proxy)));
+        registry = EscrowRegistry(payable(address(proxy)));
 
         vm.deal(sponsor, 100 ether);
         vm.deal(talent, 1 ether);
