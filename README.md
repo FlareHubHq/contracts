@@ -64,3 +64,32 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+interface IEscrowRegistry {
+  enum Kind { Bounty, Contract }
+  function createBountyEscrow(
+    bytes32 listingId,
+    address token,
+    uint256 totalAmount,
+    uint64 deadline,
+    uint64 clawbackAfter
+  ) external payable returns (uint256 escrowId);
+
+  function createContractEscrow(
+    bytes32 listingId,
+    address token,
+    uint256[] calldata milestoneAmounts,
+    uint64 clawbackAfter
+  ) external payable returns (uint256 escrowId);
+
+  function deposit(uint256 escrowId, uint256 amount) external payable;
+  function setDistributionRoot(uint256 escrowId, bytes32 merkleRoot) external; // Operator/Sponsor
+  function claim(uint256 escrowId, uint256 amount, bytes32[] calldata proof) external; // Bounty
+
+  // Contract milestones
+  function fundMilestone(uint256 escrowId, uint256 idx, uint256 amount) external payable;
+  function approveMilestone(uint256 escrowId, uint256 idx, bytes calldata sponsorSig, bytes calldata operatorSig) external;
+  function claimMilestone(uint256 escrowId, uint256 idx) external;
+
+  function refundRemainder(uint256 escrowId) external; // after clawbackAfter
+}
