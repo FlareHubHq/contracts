@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console} from "forge-std/Script.sol";
-import {EscrowRegistry} from "../src/EscrowRegistry.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Script, console } from "forge-std/Script.sol";
+import { EscrowRegistry } from "../src/EscrowRegistry.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployEscrow is Script {
     function run() external returns (address impl, address proxy) {

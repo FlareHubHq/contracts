@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {IEscrowRegistry} from "./interfaces/IEscrowRegistry.sol";
-import {EscrowStorage} from "./storage/EscrowStorage.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import { EIP712Upgradeable } from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import { IEscrowRegistry } from "./interfaces/IEscrowRegistry.sol";
+import { EscrowStorage } from "./storage/EscrowStorage.sol";
 import {
     NotAuthorized,
     TokenNotAllowed,
@@ -64,7 +64,7 @@ contract EscrowRegistry is
         _nextEscrowId = 1;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner { }
 
     function setOperator(address newOperator) external onlyOwner {
         emit OperatorUpdated(operator, newOperator);
@@ -79,11 +79,7 @@ contract EscrowRegistry is
         tokenAllowed[token] = allowed;
     }
 
-    function createBountyEscrow(
-        address token,
-        uint256 totalAmount,
-        uint64 clawbackAt
-    ) external returns (uint256 id) {
+    function createBountyEscrow(address token, uint256 totalAmount, uint64 clawbackAt) external returns (uint256 id) {
         if (token != address(0) && !tokenAllowed[token]) revert TokenNotAllowed(token);
         id = _nextEscrowId++;
         escrowKind[id] = IEscrowRegistry.EscrowKind.Bounty;
@@ -96,13 +92,7 @@ contract EscrowRegistry is
             clawbackAt: clawbackAt,
             paused: false
         });
-        emit EscrowCreated(
-            id,
-            IEscrowRegistry.EscrowKind.Bounty,
-            msg.sender,
-            token,
-            totalAmount
-        );
+        emit EscrowCreated(id, IEscrowRegistry.EscrowKind.Bounty, msg.sender, token, totalAmount);
     }
 
     function fundBounty(uint256 escrowId, uint256 amount) external payable {
@@ -120,30 +110,22 @@ contract EscrowRegistry is
         emit EscrowFunded(escrowId, msg.sender, amount);
     }
 
-    function setDistributionRoot(
-        uint256 escrowId,
-        bytes32 root,
-        string calldata version
-    ) external onlyOperatorOrOwner {
+    function setDistributionRoot(uint256 escrowId, bytes32 root, string calldata version)
+        external
+        onlyOperatorOrOwner
+    {
         if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
         BountyEscrow storage e = bounties[escrowId];
         e.root = root;
         emit EscrowDistributionRootSet(escrowId, root, version);
     }
 
-    function claimBounty(
-        uint256 escrowId,
-        uint256 amount,
-        bytes32 offchainHash,
-        bytes32[] calldata proof
-    ) external {
+    function claimBounty(uint256 escrowId, uint256 amount, bytes32 offchainHash, bytes32[] calldata proof) external {
         if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.Bounty) revert InvalidKind();
         BountyEscrow storage e = bounties[escrowId];
         if (e.paused) revert ContractPaused();
         if (e.root == bytes32(0)) revert NoRoot();
-        bytes32 leaf = keccak256(
-            abi.encodePacked(offchainHash, msg.sender, amount)
-        );
+        bytes32 leaf = keccak256(abi.encodePacked(offchainHash, msg.sender, amount));
         if (!MerkleProof.verify(proof, e.root, leaf)) revert InvalidProof();
         if (bountyLeafClaimed[escrowId][leaf]) revert AlreadyClaimed();
         if (e.balance < amount) revert InsufficientBalance();
@@ -167,9 +149,7 @@ contract EscrowRegistry is
     function pauseEscrow(uint256 escrowId) external onlyOperatorOrOwner {
         if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.Bounty) {
             bounties[escrowId].paused = true;
-        } else if (
-            escrowKind[escrowId] == IEscrowRegistry.EscrowKind.ContractEscrow
-        ) {
+        } else if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.ContractEscrow) {
             contractsMeta[escrowId].paused = true;
         } else {
             revert InvalidEscrow();
@@ -180,9 +160,7 @@ contract EscrowRegistry is
     function unpauseEscrow(uint256 escrowId) external onlyOperatorOrOwner {
         if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.Bounty) {
             bounties[escrowId].paused = false;
-        } else if (
-            escrowKind[escrowId] == IEscrowRegistry.EscrowKind.ContractEscrow
-        ) {
+        } else if (escrowKind[escrowId] == IEscrowRegistry.EscrowKind.ContractEscrow) {
             contractsMeta[escrowId].paused = false;
         } else {
             revert InvalidEscrow();
@@ -190,11 +168,10 @@ contract EscrowRegistry is
         emit EscrowUnpaused(escrowId);
     }
 
-    function createContractEscrow(
-        address token,
-        uint64 clawbackAt,
-        uint256[] memory amounts
-    ) external returns (uint256 id) {
+    function createContractEscrow(address token, uint64 clawbackAt, uint256[] memory amounts)
+        external
+        returns (uint256 id)
+    {
         if (token != address(0) && !tokenAllowed[token]) revert TokenNotAllowed(token);
         id = _nextEscrowId++;
         escrowKind[id] = IEscrowRegistry.EscrowKind.ContractEscrow;
@@ -206,29 +183,16 @@ contract EscrowRegistry is
             paused: false
         });
         for (uint256 i = 0; i < amounts.length; i++) {
-            milestones[id][i] = Milestone({
-                amount: amounts[i],
-                funded: 0,
-                claimed: 0,
-                refunded: false
-            });
+            milestones[id][i] = Milestone({ amount: amounts[i], funded: 0, claimed: 0, refunded: false });
         }
         uint256 total;
-        for (uint256 i2 = 0; i2 < amounts.length; i2++) total += amounts[i2];
-        emit EscrowCreated(
-            id,
-            IEscrowRegistry.EscrowKind.ContractEscrow,
-            msg.sender,
-            token,
-            total
-        );
+        for (uint256 i2 = 0; i2 < amounts.length; i2++) {
+            total += amounts[i2];
+        }
+        emit EscrowCreated(id, IEscrowRegistry.EscrowKind.ContractEscrow, msg.sender, token, total);
     }
 
-    function fundMilestone(
-        uint256 escrowId,
-        uint256 index,
-        uint256 amount
-    ) external payable {
+    function fundMilestone(uint256 escrowId, uint256 index, uint256 amount) external payable {
         if (escrowKind[escrowId] != IEscrowRegistry.EscrowKind.ContractEscrow) revert InvalidKind();
         ContractMeta storage m = contractsMeta[escrowId];
         if (m.paused) revert ContractPaused();
@@ -281,20 +245,10 @@ contract EscrowRegistry is
             if (op != operator) revert OperatorMismatch();
         }
         nonceUsed[a.escrowId][a.milestoneIndex][a.nonce] = true;
-        emit EscrowMilestoneApproved(
-            a.escrowId,
-            a.milestoneIndex,
-            msg.sender,
-            structHash
-        );
+        emit EscrowMilestoneApproved(a.escrowId, a.milestoneIndex, msg.sender, structHash);
         ms.claimed += a.amount;
         _payout(cm.token, a.talent, a.amount);
-        emit EscrowMilestoneClaimed(
-            a.escrowId,
-            a.milestoneIndex,
-            a.talent,
-            a.amount
-        );
+        emit EscrowMilestoneClaimed(a.escrowId, a.milestoneIndex, a.talent, a.amount);
     }
 
     function directRelease(
@@ -314,17 +268,8 @@ contract EscrowRegistry is
         Milestone storage ms = milestones[escrowId][index];
         uint256 available = ms.funded - ms.claimed;
         if (!(amount <= available && amount > 0)) revert AmountInvalid();
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TYPEHASH_DIRECT_RELEASE,
-                escrowId,
-                talent,
-                cm.token,
-                amount,
-                nonce,
-                expiration
-            )
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(TYPEHASH_DIRECT_RELEASE, escrowId, talent, cm.token, amount, nonce, expiration));
         nonceUsed[escrowId][index][nonce] = true;
         emit EscrowMilestoneApproved(escrowId, index, msg.sender, structHash);
         ms.claimed += amount;

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console2} from "forge-std/Test.sol";
-import {EscrowRegistry} from "../src/EscrowRegistry.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { EscrowRegistry } from "../src/EscrowRegistry.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract EscrowTest is Test {
     EscrowRegistry public registry;
@@ -26,7 +26,7 @@ contract EscrowTest is Test {
 
         // fund 1 ether
         vm.prank(sponsor);
-        registry.fundBounty{value: 1 ether}(id, 1 ether);
+        registry.fundBounty{ value: 1 ether }(id, 1 ether);
 
         // single-leaf merkle: leaf = keccak256(abi.encodePacked(offchainHash, claimant, amount)), proof = []
         bytes32 offchain = keccak256("my-offchain-escrow-id");
@@ -50,7 +50,7 @@ contract EscrowTest is Test {
 
         // fund first milestone 1 ether
         vm.prank(sponsor);
-        registry.fundMilestone{value: 1 ether}(id, 0, 1 ether);
+        registry.fundMilestone{ value: 1 ether }(id, 0, 1 ether);
 
         // direct release 0.4 ether
         vm.prank(sponsor);
