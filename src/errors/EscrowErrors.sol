@@ -23,3 +23,5 @@ error SponsorMismatch();
 error OperatorMismatch();
 error TokenMismatch();
 error TransferFailed();
+error SignerNotSet();
+error InvalidSignature();

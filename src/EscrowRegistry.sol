@@ -33,7 +33,9 @@ import {
     NonceUsed,
     SponsorMismatch,
     OperatorMismatch,
-    TokenMismatch
+    TokenMismatch,
+    SignerNotSet,
+    InvalidSignature
 } from "./errors/EscrowErrors.sol";
 
 contract EscrowRegistry is
@@ -82,6 +84,7 @@ contract EscrowRegistry is
         __Pausable_init();
         __EIP712_init("FlareHubEscrow", "1");
         operator = operator_;
+        claimsSigner = operator_;
         _nextEscrowId = 1;
     }
 
@@ -90,6 +93,11 @@ contract EscrowRegistry is
     function setOperator(address newOperator) external onlyOwner {
         emit OperatorUpdated(operator, newOperator);
         operator = newOperator;
+    }
+
+    function setClaimsSigner(address newSigner) external onlyOwner {
+        emit ClaimsSignerUpdated(claimsSigner, newSigner);
+        claimsSigner = newSigner;
     }
 
     function nextEscrowId() external view override returns (uint256) {
@@ -139,18 +147,44 @@ contract EscrowRegistry is
         emit EscrowDistributionRootSet(escrowId, root, version);
     }
 
-    function claimBounty(uint256 escrowId, uint256 amount, bytes32 offchainHash, bytes32[] calldata proof) external {
+    function claimBounty(
+        uint256 escrowId,
+        uint256 amount,
+        uint256 nonce,
+        uint64 expiration,
+        bytes calldata signature
+    ) external {
         BountyEscrow storage e = _getBounty(escrowId);
         if (e.paused) revert ContractPaused();
-        if (e.root == bytes32(0)) revert NoRoot();
-        bytes32 leaf = keccak256(abi.encodePacked(offchainHash, msg.sender, amount));
-        if (!MerkleProof.verify(proof, e.root, leaf)) revert InvalidProof();
-        if (bountyLeafClaimed[escrowId][leaf]) revert AlreadyClaimed();
+        if (block.timestamp > expiration) revert Expired();
+        if (amount == 0) revert AmountInvalid();
         if (e.balance < amount) revert InsufficientBalance();
-        bountyLeafClaimed[escrowId][leaf] = true;
+        address signer = claimsSigner;
+        if (signer == address(0)) revert SignerNotSet();
+        if (msg.sender == address(0)) revert NotAuthorized(address(0));
+        bytes32 nonceKey = keccak256(abi.encodePacked(msg.sender, nonce));
+        if (bountyClaimUsed[escrowId][nonceKey]) revert NonceUsed();
+        bytes32 structHash = keccak256(
+            abi.encode(TYPEHASH_BOUNTY_CLAIM, escrowId, msg.sender, amount, nonce, expiration)
+        );
+        bytes32 digest = _hashTypedDataV4(structHash);
+        address recovered = ECDSA.recover(digest, signature);
+        if (recovered != signer) revert InvalidSignature();
+        bountyClaimUsed[escrowId][nonceKey] = true;
         e.balance -= amount;
         _payout(e.token, msg.sender, amount);
-        emit EscrowClaimed(escrowId, msg.sender, amount, leaf);
+        emit EscrowClaimed(escrowId, msg.sender, amount, structHash);
+    }
+
+    function getBountyClaimDigest(
+        uint256 escrowId,
+        address claimant,
+        uint256 amount,
+        uint256 nonce,
+        uint64 expiration
+    ) external view returns (bytes32) {
+        bytes32 structHash = keccak256(abi.encode(TYPEHASH_BOUNTY_CLAIM, escrowId, claimant, amount, nonce, expiration));
+        return _hashTypedDataV4(structHash);
     }
 
     function refundRemainder(uint256 escrowId) external {

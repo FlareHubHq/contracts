@@ -20,7 +20,12 @@ contract EscrowTest is Test {
         vm.deal(talent, 1 ether);
     }
 
-    function test_Bounty_CreateFundSetRootClaimAndRefund() public {
+    function test_Bounty_CreateFundClaimWithSigAndRefund() public {
+        uint256 signerKey = 0xA11CE;
+        address signer = vm.addr(signerKey);
+        address owner = registry.owner();
+        vm.prank(owner);
+        registry.setClaimsSigner(signer);
         vm.prank(sponsor);
         uint256 id = registry.createBountyEscrow(address(0), 1 ether, 0); // allow immediate clawback
 
@@ -28,16 +33,14 @@ contract EscrowTest is Test {
         vm.prank(sponsor);
         registry.fundBounty{ value: 1 ether }(id, 1 ether);
 
-        // single-leaf merkle: leaf = keccak256(abi.encodePacked(offchainHash, claimant, amount)), proof = []
-        bytes32 offchain = keccak256("my-offchain-escrow-id");
-        bytes32 leaf = keccak256(abi.encodePacked(offchain, talent, uint256(0.5 ether)));
+        uint256 nonce = 1;
+        uint64 expiration = uint64(block.timestamp + 1 days);
+        bytes32 digest = registry.getBountyClaimDigest(id, talent, 0.5 ether, nonce, expiration);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
+        bytes memory sig = abi.encodePacked(r, s, v);
 
-        // set root (owner can set)
-        registry.setDistributionRoot(id, leaf, "v1");
-
-        // claim half
         vm.prank(talent);
-        registry.claimBounty(id, 0.5 ether, offchain, new bytes32[](0));
+        registry.claimBounty(id, 0.5 ether, nonce, expiration, sig);
 
         // refund remainder
         vm.prank(sponsor);

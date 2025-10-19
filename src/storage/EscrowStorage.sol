@@ -43,13 +43,16 @@ abstract contract EscrowStorage {
     bytes32 internal constant TYPEHASH_DIRECT_RELEASE = keccak256(
         "DirectReleaseAuthorization(uint256 escrowId,address talent,address token,uint256 amount,uint256 nonce,uint64 expiration)"
     );
+    bytes32 internal constant TYPEHASH_BOUNTY_CLAIM = keccak256(
+        "BountyClaim(uint256 escrowId,address claimant,uint256 amount,uint256 nonce,uint64 expiration)"
+    );
 
     // State
     uint256 internal _nextEscrowId;
     mapping(uint256 => IEscrowRegistry.EscrowKind) public escrowKind;
 
     mapping(uint256 => BountyEscrow) public bounties;
-    mapping(uint256 => mapping(bytes32 => bool)) public bountyLeafClaimed;
+    mapping(uint256 => mapping(bytes32 => bool)) public bountyClaimUsed;
 
     mapping(uint256 => ContractMeta) public contractsMeta;
     mapping(uint256 => mapping(uint256 => Milestone)) public milestones; // escrowId => index => Milestone
@@ -58,6 +61,7 @@ abstract contract EscrowStorage {
     mapping(address => bool) public tokenAllowed;
 
     address public operator;
+    address public claimsSigner;
 
     uint256[50] private __gap;
 
