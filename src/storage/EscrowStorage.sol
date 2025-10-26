@@ -14,7 +14,6 @@ abstract contract EscrowStorage {
         address token;
         uint256 totalAmount;
         uint256 balance;
-        bytes32 root;
         uint64 clawbackAt;
         bool paused;
     }
@@ -61,7 +60,6 @@ abstract contract EscrowStorage {
     mapping(address => bool) public tokenAllowed;
 
     address public operator;
-    address public claimsSigner;
 
     uint256[50] private __gap;
 

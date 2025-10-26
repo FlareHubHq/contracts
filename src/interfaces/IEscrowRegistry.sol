@@ -21,8 +21,7 @@ interface IEscrowRegistry {
         uint256 indexed escrowId, EscrowKind kind, address indexed sponsor, address token, uint256 totalAmount
     );
     event EscrowFunded(uint256 indexed escrowId, address indexed funder, uint256 amount);
-    event EscrowDistributionRootSet(uint256 indexed escrowId, bytes32 root, string version);
-    event EscrowClaimed(uint256 indexed escrowId, address indexed claimant, uint256 amount, bytes32 leafHash);
+    event EscrowClaimed(uint256 indexed escrowId, address indexed claimant, uint256 amount);
     event EscrowRemainderRefunded(uint256 indexed escrowId, address indexed sponsor, uint256 amount);
 
     event EscrowMilestoneFunded(
@@ -41,7 +40,6 @@ interface IEscrowRegistry {
     event EscrowPaused(uint256 indexed escrowId);
     event EscrowUnpaused(uint256 indexed escrowId);
     event OperatorUpdated(address indexed previousOperator, address indexed newOperator);
-    event ClaimsSignerUpdated(address indexed previousSigner, address indexed newSigner);
 
     function nextEscrowId() external view returns (uint256);
 
@@ -50,7 +48,6 @@ interface IEscrowRegistry {
 
     function createBountyEscrow(address token, uint256 totalAmount, uint64 clawbackAt) external returns (uint256 id);
     function fundBounty(uint256 escrowId, uint256 amount) external payable;
-    function setDistributionRoot(uint256 escrowId, bytes32 root, string calldata version) external;
     function claimBounty(
         uint256 escrowId,
         uint256 amount,
@@ -59,8 +56,6 @@ interface IEscrowRegistry {
         bytes calldata signature
     ) external;
     function refundRemainder(uint256 escrowId) external;
-
-    function setClaimsSigner(address newSigner) external;
 
     function createContractEscrow(address token, uint64 clawbackAt, uint256[] memory amounts)
         external

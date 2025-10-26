@@ -9,7 +9,6 @@ import { EIP712Upgradeable } from "@openzeppelin/contracts-upgradeable/utils/cry
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import { IEscrowRegistry } from "./interfaces/IEscrowRegistry.sol";
 import { EscrowStorage } from "./storage/EscrowStorage.sol";
 import {
@@ -19,9 +18,6 @@ import {
     ContractPaused,
     InvalidValue,
     NoEthAllowed,
-    NoRoot,
-    InvalidProof,
-    AlreadyClaimed,
     InsufficientBalance,
     SponsorOnly,
     TimeNotReached,
@@ -34,10 +30,9 @@ import {
     SponsorMismatch,
     OperatorMismatch,
     TokenMismatch,
-    SignerNotSet,
+    OperatorNotSet,
     InvalidSignature
 } from "./errors/EscrowErrors.sol";
-
 contract EscrowRegistry is
     Initializable,
     UUPSUpgradeable,
@@ -84,7 +79,6 @@ contract EscrowRegistry is
         __Pausable_init();
         __EIP712_init("FlareHubEscrow", "1");
         operator = operator_;
-        claimsSigner = operator_;
         _nextEscrowId = 1;
     }
 
@@ -93,11 +87,6 @@ contract EscrowRegistry is
     function setOperator(address newOperator) external onlyOwner {
         emit OperatorUpdated(operator, newOperator);
         operator = newOperator;
-    }
-
-    function setClaimsSigner(address newSigner) external onlyOwner {
-        emit ClaimsSignerUpdated(claimsSigner, newSigner);
-        claimsSigner = newSigner;
     }
 
     function nextEscrowId() external view override returns (uint256) {
@@ -117,7 +106,6 @@ contract EscrowRegistry is
             token: token,
             totalAmount: totalAmount,
             balance: 0,
-            root: bytes32(0),
             clawbackAt: clawbackAt,
             paused: false
         });
@@ -138,15 +126,6 @@ contract EscrowRegistry is
         emit EscrowFunded(escrowId, msg.sender, amount);
     }
 
-    function setDistributionRoot(uint256 escrowId, bytes32 root, string calldata version)
-        external
-        onlyOperatorOrOwner
-    {
-        BountyEscrow storage e = _getBounty(escrowId);
-        e.root = root;
-        emit EscrowDistributionRootSet(escrowId, root, version);
-    }
-
     function claimBounty(
         uint256 escrowId,
         uint256 amount,
@@ -159,8 +138,8 @@ contract EscrowRegistry is
         if (block.timestamp > expiration) revert Expired();
         if (amount == 0) revert AmountInvalid();
         if (e.balance < amount) revert InsufficientBalance();
-        address signer = claimsSigner;
-        if (signer == address(0)) revert SignerNotSet();
+        address signer = operator;
+        if (signer == address(0)) revert OperatorNotSet();
         if (msg.sender == address(0)) revert NotAuthorized(address(0));
         bytes32 nonceKey = keccak256(abi.encodePacked(msg.sender, nonce));
         if (bountyClaimUsed[escrowId][nonceKey]) revert NonceUsed();
@@ -173,7 +152,7 @@ contract EscrowRegistry is
         bountyClaimUsed[escrowId][nonceKey] = true;
         e.balance -= amount;
         _payout(e.token, msg.sender, amount);
-        emit EscrowClaimed(escrowId, msg.sender, amount, structHash);
+        emit EscrowClaimed(escrowId, msg.sender, amount);
     }
 
     function getBountyClaimDigest(
