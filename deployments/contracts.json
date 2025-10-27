@@ -1,5 +1,12 @@
-{
-  "chainId": 14,
-  "implementation": "0x9369dF118065d49be7BeC61cD8dA94f2D1738b9a",
-  "proxy": "0xA5Fa69050abE526C99d40BA259E11B627b7CC04f"
-}
+[
+  {
+    "chainId": 14,
+    "implementation": "0xEA47826461f42166DAc7ec63924f583cF14fEb13",
+    "proxy": "0xA5Fa69050abE526C99d40BA259E11B627b7CC04f"
+  },
+  {
+    "chainId": 114,
+    "implementation": "0x45cA452351B59F415317070B4C1D2fA82035d481",
+    "proxy": "0xf0b2DFE13eC56276463C871d8b9FF0B4A46CEE7e"
+  }
+]
